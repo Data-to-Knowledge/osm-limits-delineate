@@ -1,0 +1,6 @@
+version: "3"
+services:
+  sql-check:
+    image: mullenkamp/sql-server-check:latest
+    volumes:
+      - /media/waterdata1/git/ConsentsReporting/sflake/sql-checks/parameters-dev.yml:/parameters.yml
