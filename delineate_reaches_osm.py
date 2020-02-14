@@ -51,18 +51,15 @@ no_limit_id = 368
 
 cwms_gis = {'server': '172.23.92.198', 'database': 'GIS', 'table': 'CWMS_NZTM_ZONES', 'col_names': ['ZONE_NAME'], 'rename_cols': ['cwms'], 'geo_col': True}
 
-base_path = r'P:\WaterDataProgramme\limit_points'
+#base_path = r'P:\WaterDataProgramme\limit_points'
 
-#pts_gpkg = 'sw_limit_points.gpkg'
-#layer_name = 'sw_limit_points'
-#crs1 = {'init': 'epsg:2193'}
-
-nodes_shp = 'site_nodes_2020-02-07.shp'
+#nodes_shp = 'site_nodes_2020-02-07.shp'
+#delin_shp = 'reach_delin_limit_osm_2020-02-07.shp'
 
 osm.op_endpoint = 'http://10.8.1.5/api/interpreter'
+#osm.op_endpoint = 'https://overpass-api.de/api/interpreter'
 #op_endpoint = 'http://10.8.1.5/api/interpreter'
 
-delin_shp = 'reach_delin_limit_osm_2020-02-07.shp'
 
 poly_shp = r'C:\ecan\git\gistools\gistools\datasets\shapefiles\catchment_pareora.shp'
 
@@ -99,21 +96,15 @@ cwms1 = mssql.rd_sql(**cwms_gis)
 zones3 = mssql.rd_sql(gis_server, gis_db, allo_zones_table, [allo_zones_id], where_in={allo_zones_id: combined_zones2}, username=gis_username, password=gis_password, geo_col=True, rename_cols=[id_col])
 zones4 = zones3.unary_union
 
-#pts = pts.to_crs('epsg:2193')
-
-#pts = gpd.read_file(os.path.join(base_path, pts_gpkg), layer=layer_name)
-#
-#pts = pts[['ManagementGroupID', 'geometry']].copy()
-
 pts['geometry'] = pts.geometry.simplify(1)
 
 #######################################
 ### Run query
 print('--Pull out the waterways from OSM')
+
 pts1 = osm.get_nearest_waterways(pts, id_col, 100, 'all')
 
 #pts1.to_file(os.path.join(base_path, nodes_shp))
-
 waterways, nodes = osm.get_waterways(pts1, 'all')
 
 print('--Delineating Reaches from OSM')
@@ -124,12 +115,12 @@ gdf1 = osm.to_gdf(osm_delin)
 
 gdf2 = gdf1.to_crs(pts.crs)
 
-#gdf3 = gdf2.merge(pts1.rename(columns={'id': 'start_node'})[['start_node', id_col]], on='start_node').dissolve([id_col, 'name']).reset_index().drop('way_id', axis=1)
 gdf3 = gdf2.merge(pts1.rename(columns={'id': 'start_node'})[['start_node', id_col]], on='start_node')
 
 #gdf3.to_file(os.path.join(base_path, delin_shp))
 
 print('--Pulling out all of Canterbury...')
+
 cant2 = osm.get_waterways_within_boundary(cwms1, buffer=0, waterway_type='all')
 
 combined1, poly1 = vector.pts_poly_join(cant2, zones3, id_col, op='intersects')
@@ -146,6 +137,7 @@ gdf4['OSMWaterwayId'] = gdf4['OSMWaterwayId'].astype('int64')
 #gdf4['StartNode'] = gdf4['StartNode'].astype('int64')
 
 print('--Compare existing reaches in the database')
+
 cols = gdf4.columns.drop('geometry').tolist()
 cols.extend(['OBJECTID'])
 
@@ -157,6 +149,7 @@ diff1 = comp_dict['diff'].copy()
 rem1 = comp_dict['remove'][['SpatialUnitId', 'OSMWaterwayId']].copy()
 
 print('--Save to database')
+
 sql_dtypes = {'StartNode': types.BIGINT(), 'OSMWaterwayId': types.BIGINT(), 'RiverName': types.NVARCHAR(200), 'OSMWaterwayType': types.NVARCHAR(30), 'SpatialUnitId': types.NVARCHAR(8), 'SHAPE_': types.VARCHAR(), 'OBJECTID': types.INT(), 'ModifiedDate': types.DATETIME()}
 
 if not new1.empty:
