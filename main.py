@@ -22,17 +22,17 @@ pd.options.display.max_columns = 10
 ### Read in parameters
 print('---Read in parameters')
 
-base_dir = os.path.realpath(os.path.dirname(__file__))
-
-with open(os.path.join(base_dir, 'parameters-dev.yml')) as param:
-    param = yaml.safe_load(param)
-
-#parser = argparse.ArgumentParser()
-#parser.add_argument('yaml_path')
-#args = parser.parse_args()
+#base_dir = os.path.realpath(os.path.dirname(__file__))
 #
-#with open(args.yaml_path) as param:
+#with open(os.path.join(base_dir, 'parameters-dev.yml')) as param:
 #    param = yaml.safe_load(param)
+
+parser = argparse.ArgumentParser()
+parser.add_argument('yaml_path')
+args = parser.parse_args()
+
+with open(args.yaml_path) as param:
+    param = yaml.safe_load(param)
 
 
 ########################################
