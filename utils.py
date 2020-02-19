@@ -22,15 +22,12 @@ today1 = pd.Timestamp.today()
 
 month_map = {1: 'Jul', 2: 'Aug', 3: 'Sep', 4: 'Oct', 5: 'Nov', 6: 'Dec', 7: 'Jan', 8: 'Feb', 9: 'Mar', 10: 'Apr', 11: 'May', 12: 'Jun'}
 
-api_url = 'https://waterdata-dev-apis.azure-api.net/planlimits/v1/ManagementGroup/List'
-api_headers = {'Ocp-Apim-Subscription-Key': '2b672c6e34eb4829ad80b55377c0dfda'}
-
 ##########################################
 ### Functions
 
 
 
-def get_json_from_api():
+def get_json_from_api(api_url, api_headers):
     """
 
     """

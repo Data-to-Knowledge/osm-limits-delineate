@@ -4,12 +4,11 @@ Created on Tue Nov 26 19:36:49 2019
 
 @author: michaelek
 """
-import os
 import pandas as pd
 import geopandas as gpd
 from pdsql import mssql, util
 from gistools import osm, vector
-from utils import json_filters, geojson_convert, process_limit_data, assign_notes, get_json_from_api
+from utils import json_filters, geojson_convert, get_json_from_api
 from sqlalchemy import types
 
 pd.options.display.max_columns = 10
@@ -20,177 +19,121 @@ today_str  = today.strftime('%Y-%m-%d %H:%M:%S')
 ########################################
 ### Parameters
 
-pl_server = 'azwaterdatasql.internal.ecan.govt.nz'
-pl_db = 'planlimits'
-
-pl_username = 'planlimitsuser'
-pl_password = '7x#H"A6Lj)xu(<'
-
-su_table = 'spatialunit'
-sg_table = 'spatialgroup'
-mg_table = 'ManagementGroup'
-
-gis_server = '172.23.92.244'
-gis_db = 'gis_waterdata'
-
-gis_username = 'ReportingServices'
-gis_password = 'coffee2go'
-
-pts_table = 'WD_NZTM_Surface_Water_Points'
-pts_id = 'GeoPK'
-id_col = 'SpatialUnitId'
-
-allo_zones_table = 'WD_NZTM_GROUNDWATER_ALLOCATION_ZONES'
-allo_zones_id = 'GeoPK'
-
-reaches_table = 'WD_NZTM_RIVERS'
-
-#zone_exceptions = ['CWAZ0004', 'CWAZ0005', 'CWAZ0006', 'CWAZ0007', 'CWAZ0008', 'CWAZ0009']
-combined_zones_id = 371
-no_limit_id = 368
-
-cwms_gis = {'server': '172.23.92.198', 'database': 'GIS', 'table': 'CWMS_NZTM_ZONES', 'col_names': ['ZONE_NAME'], 'rename_cols': ['cwms'], 'geo_col': True}
-
-#base_path = r'P:\WaterDataProgramme\limit_points'
-
-#nodes_shp = 'site_nodes_2020-02-07.shp'
-#delin_shp = 'reach_delin_limit_osm_2020-02-07.shp'
-
-osm.op_endpoint = 'http://10.8.1.5/api/interpreter'
-#osm.op_endpoint = 'https://overpass-api.de/api/interpreter'
-#op_endpoint = 'http://10.8.1.5/api/interpreter'
-
-
-poly_shp = r'C:\ecan\git\gistools\gistools\datasets\shapefiles\catchment_pareora.shp'
-
 add_geo_column = "alter table {table} add {sfield} geometry"
 update_geo_stmt = "UPDATE {table} SET {sfield} = geometry::STGeomFromText({sfield}, 2193) where SpatialUnitId in ({names})"
 drop_column = "alter table {table} drop {ofield}"
 
-#mssql.del_table_rows(param['output']['server'], param['output']['database'], 'SpatialUnit', stmt=update_geo_stmt.format(names=str(s_gdf3['SpatialUnitID'].tolist())[1:-1]))
+id_col = 'SpatialUnitId'
 
-########################################
-### Load data
 
-run_time_start = pd.Timestamp.today().strftime('%Y-%m-%d %H:%M:%S')
-print(run_time_start)
+def osm_delineation(param):
+    """
 
-## Read in source data
-print('--Reading in source data...')
+    """
+    osm.op_endpoint = param['osm']['op_endpoint']
 
-json_lst = get_json_from_api()
-json_lst1 = json_filters(json_lst, only_operative=True, only_reach_points=True)
-gjson1, hydro_units, pts_alt, sg1 = geojson_convert(json_lst1)
+    ########################################
+    ### Load data
 
-combined_zones1 = [j for j in json_lst if j['id'] == combined_zones_id][0]
-combined_zones2 = [s['id'] for s in combined_zones1['spatialUnit']]
+    run_time_start = pd.Timestamp.today().strftime('%Y-%m-%d %H:%M:%S')
+    print(run_time_start)
 
-no_limit1 = [j for j in json_lst if j['id'] == no_limit_id][0]
-no_limit2 = [s['id'] for s in no_limit1['spatialUnit']][0]
+    ## Read in source data
+    print('--Reading in source data...')
 
-pts = mssql.rd_sql(gis_server, gis_db, pts_table, [pts_id], geo_col=True, username=gis_username, password=gis_password)
-pts.rename(columns={pts_id: id_col}, inplace=True)
+    json_lst = get_json_from_api(param['plan_limits']['api_url'], param['plan_limits']['api_headers'])
+    json_lst1 = json_filters(json_lst, only_operative=True, only_reach_points=True)
+    gjson1, hydro_units, pts_alt, sg1 = geojson_convert(json_lst1)
 
-cwms1 = mssql.rd_sql(**cwms_gis)
+    combined_zones1 = [j for j in json_lst if j['id'] == param['other']['combined_zones_id']][0]
+    combined_zones2 = [s['id'] for s in combined_zones1['spatialUnit']]
 
-zones3 = mssql.rd_sql(gis_server, gis_db, allo_zones_table, [allo_zones_id], where_in={allo_zones_id: combined_zones2}, username=gis_username, password=gis_password, geo_col=True, rename_cols=[id_col])
-zones4 = zones3.unary_union
+    no_limit1 = [j for j in json_lst if j['id'] == param['other']['no_limit_id']][0]
+    no_limit2 = [s['id'] for s in no_limit1['spatialUnit']][0]
 
-pts['geometry'] = pts.geometry.simplify(1)
+    pts = mssql.rd_sql(param['gis_waterdata']['server'], param['gis_waterdata']['database'], param['gis_waterdata']['pts']['table'], [param['gis_waterdata']['pts']['id']], geo_col=True, username=param['gis_waterdata']['username'], password=param['gis_waterdata']['password'], rename_cols=[id_col])
+#    pts.rename(columns={param['gis_waterdata']['pts']['id']: id_col}, inplace=True)
 
-#######################################
-### Run query
-print('--Pull out the waterways from OSM')
+    cwms1 = mssql.rd_sql(param['gis_prod']['server'], param['gis_prod']['database'], param['gis_prod']['cwms']['table'], param['gis_prod']['cwms']['col_names'], rename_cols=param['gis_prod']['cwms']['rename_cols'], geo_col=True, username=param['gis_prod']['username'], password=param['gis_prod']['password'])
 
-pts1 = osm.get_nearest_waterways(pts, id_col, 100, 'all')
+    zones3 = mssql.rd_sql(param['gis_waterdata']['server'], param['gis_waterdata']['database'], param['gis_waterdata']['allo_zones']['table'], [param['gis_waterdata']['allo_zones']['id']], where_in={param['gis_waterdata']['allo_zones']['id']: combined_zones2}, username=param['gis_waterdata']['username'], password=param['gis_waterdata']['password'], geo_col=True, rename_cols=[id_col])
 
-#pts1.to_file(os.path.join(base_path, nodes_shp))
-waterways, nodes = osm.get_waterways(pts1, 'all')
+    pts['geometry'] = pts.geometry.simplify(1)
 
-print('--Delineating Reaches from OSM')
+    #######################################
+    ### Run query
+    print('--Pull out the waterways from OSM')
 
-site_delin = osm.waterway_delineation(waterways, True)
-osm_delin = osm.to_osm(site_delin, nodes)
-gdf1 = osm.to_gdf(osm_delin)
+    pts1 = osm.get_nearest_waterways(pts, id_col, 100, 'all')
 
-gdf2 = gdf1.to_crs(pts.crs)
+    waterways, nodes = osm.get_waterways(pts1, 'all')
 
-gdf3 = gdf2.merge(pts1.rename(columns={'id': 'start_node'})[['start_node', id_col]], on='start_node')
+    print('--Delineating Reaches from OSM')
 
-#gdf3.to_file(os.path.join(base_path, delin_shp))
+    site_delin = osm.waterway_delineation(waterways, True)
+    osm_delin = osm.to_osm(site_delin, nodes)
+    gdf1 = osm.to_gdf(osm_delin)
 
-print('--Pulling out all of Canterbury...')
+    gdf2 = gdf1.to_crs(pts.crs)
 
-cant2 = osm.get_waterways_within_boundary(cwms1, buffer=0, waterway_type='all')
+    gdf3 = gdf2.merge(pts1.rename(columns={'id': 'start_node'})[['start_node', id_col]], on='start_node')
 
-combined1, poly1 = vector.pts_poly_join(cant2, zones3, id_col, op='intersects')
+    print('--Pulling out all of Canterbury...')
 
-all_others1 = cant2[~cant2.way_id.isin(combined1.way_id)]
-all_others2 = all_others1[~all_others1.way_id.isin(gdf2.way_id.unique().tolist())].copy()
-all_others2[id_col] = no_limit2
+    cant2 = osm.get_waterways_within_boundary(cwms1, buffer=0, waterway_type='all')
 
-print('--Combine all reach data')
+    combined1, poly1 = vector.pts_poly_join(cant2, zones3, id_col, op='intersects')
 
-gdf4 = pd.concat([gdf3, combined1, all_others2]).reset_index(drop=True)
-gdf4.rename(columns={'way_id': 'OSMWaterwayId', 'waterway': 'OSMWaterwayType', 'name': 'RiverName', 'start_node': 'StartNode'}, inplace=True)
-gdf4['OSMWaterwayId'] = gdf4['OSMWaterwayId'].astype('int64')
-#gdf4['StartNode'] = gdf4['StartNode'].astype('int64')
+    all_others1 = cant2[~cant2.way_id.isin(combined1.way_id)]
+    all_others2 = all_others1[~all_others1.way_id.isin(gdf2.way_id.unique().tolist())].copy()
+    all_others2[id_col] = no_limit2
 
-print('--Compare existing reaches in the database')
+    print('--Combine all reach data')
 
-cols = gdf4.columns.drop('geometry').tolist()
-cols.extend(['OBJECTID'])
+    gdf4 = pd.concat([gdf3, combined1, all_others2]).reset_index(drop=True)
+    gdf4.rename(columns={'way_id': 'OSMWaterwayId', 'waterway': 'OSMWaterwayType', 'name': 'RiverName', 'start_node': 'StartNode'}, inplace=True)
+    gdf4['OSMWaterwayId'] = gdf4['OSMWaterwayId'].astype('int64')
 
-old1 = mssql.rd_sql(gis_server, gis_db, reaches_table, cols, username=gis_username, password=gis_password, geo_col=True)
+    print('--Compare existing reaches in the database')
 
-comp_dict = util.compare_dfs(old1.drop('OBJECTID', axis=1), gdf4, on=['SpatialUnitId', 'OSMWaterwayId'])
-new1 = comp_dict['new'].copy()
-diff1 = comp_dict['diff'].copy()
-rem1 = comp_dict['remove'][['SpatialUnitId', 'OSMWaterwayId']].copy()
+    cols = gdf4.columns.drop('geometry').tolist()
+    cols.extend(['OBJECTID'])
 
-print('--Save to database')
+    old1 = mssql.rd_sql(param['gis_waterdata']['server'], param['gis_waterdata']['database'], param['gis_waterdata']['reaches']['table'], cols, username=param['gis_waterdata']['username'], password=param['gis_waterdata']['password'], geo_col=True)
 
-sql_dtypes = {'StartNode': types.BIGINT(), 'OSMWaterwayId': types.BIGINT(), 'RiverName': types.NVARCHAR(200), 'OSMWaterwayType': types.NVARCHAR(30), 'SpatialUnitId': types.NVARCHAR(8), 'SHAPE_': types.VARCHAR(), 'OBJECTID': types.INT(), 'ModifiedDate': types.DATETIME()}
+    comp_dict = util.compare_dfs(old1.drop('OBJECTID', axis=1), gdf4, on=['SpatialUnitId', 'OSMWaterwayId'])
+    new1 = comp_dict['new'].copy()
+    diff1 = comp_dict['diff'].copy()
+    rem1 = comp_dict['remove'][['SpatialUnitId', 'OSMWaterwayId']].copy()
 
-if not new1.empty:
-    max_id = old1['OBJECTID'].max() + 1
+    print('--Save to database')
 
-    new1['ModifiedDate'] = today_str
-    new1['OBJECTID'] = list(range(max_id, max_id + len(new1)))
-    new1.rename(columns={'geometry': 'SHAPE'}, inplace=True)
+    sql_dtypes = {'StartNode': types.BIGINT(), 'OSMWaterwayId': types.BIGINT(), 'RiverName': types.NVARCHAR(200), 'OSMWaterwayType': types.NVARCHAR(30), 'SpatialUnitId': types.NVARCHAR(8), 'SHAPE_': types.VARCHAR(), 'OBJECTID': types.INT(), 'ModifiedDate': types.DATETIME()}
 
-    mssql.update_table_rows(new1, gis_server, gis_db, reaches_table, on=['SpatialUnitId', 'OSMWaterwayId'], index=False, append=True, username=None, password=None, geo_col='SHAPE', clear_table=False, dtype=sql_dtypes)
+    if not new1.empty:
+        max_id = old1['OBJECTID'].max() + 1
 
-if not diff1.empty:
-    diff2 = pd.merge(diff1, old1[['SpatialUnitId', 'OSMWaterwayId', 'OBJECTID']], on=['SpatialUnitId', 'OSMWaterwayId'])
-    diff1['ModifiedDate'] = today_str
-    diff1.rename(columns={'geometry': 'SHAPE'}, inplace=True)
+        new1['ModifiedDate'] = today_str
+        new1['OBJECTID'] = list(range(max_id, max_id + len(new1)))
+        new1.rename(columns={'geometry': 'SHAPE'}, inplace=True)
 
-    mssql.update_table_rows(diff1, gis_server, gis_db, reaches_table, on=['SpatialUnitId', 'OSMWaterwayId'], index=False, append=True, username=None, password=None, geo_col='SHAPE', clear_table=False, dtype=sql_dtypes)
+        mssql.update_table_rows(new1, param['gis_waterdata']['server'], param['gis_waterdata']['database'], param['gis_waterdata']['reaches']['table'], on=['SpatialUnitId', 'OSMWaterwayId'], index=False, append=True, username=None, password=None, geo_col='SHAPE', clear_table=False, dtype=sql_dtypes)
 
-if not rem1.empty:
-    mssql.del_table_rows(gis_server, gis_db, reaches_table, pk_df=rem1, username=None, password=None)
+    if not diff1.empty:
+        diff2 = pd.merge(diff1, old1[['SpatialUnitId', 'OSMWaterwayId', 'OBJECTID']], on=['SpatialUnitId', 'OSMWaterwayId'])
+        diff2['ModifiedDate'] = today_str
+        diff2.rename(columns={'geometry': 'SHAPE'}, inplace=True)
+
+        mssql.update_table_rows(diff2, param['gis_waterdata']['server'], param['gis_waterdata']['database'], param['gis_waterdata']['reaches']['table'], on=['SpatialUnitId', 'OSMWaterwayId'], index=False, append=True, username=None, password=None, geo_col='SHAPE', clear_table=False, dtype=sql_dtypes)
+
+    if not rem1.empty:
+        mssql.del_table_rows(param['gis_waterdata']['server'], param['gis_waterdata']['database'], param['gis_waterdata']['reaches']['table'], pk_df=rem1, username=None, password=None)
+
+    return gdf4
 
 ########################################
 ### Testing
 
-#poly = gpd.read_file(poly_shp)
-
-#server = '172.23.92.244'
-#database = 'gis_waterdata'
-#table = 'WD_NZTM_RIVERS'
-#on=['SpatialUnitId', 'OSMWaterwayId']
-#index=False
-#append=True
-#username=None
-#password=None
-#geo_col='SHAPE'
-#
-#df = gdf4[:100].copy()
-#df = gdf4.copy()
-#
-#h1 = old1.geometry.apply(lambda x: hash(x.wkt))
-#h2 = gdf4.geometry.apply(lambda x: hash(x.wkt))
 
 
 

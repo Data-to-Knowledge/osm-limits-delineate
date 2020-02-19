@@ -1,6 +1,6 @@
 FROM python:3.7-slim
 
-COPY requirements.txt utils.py process_limits.py process_allocation.py process_waps.py main.py ./
+COPY requirements.txt utils.py delineate_reaches_osm.py main.py ./
 
 ENV TZ='Pacific/Auckland'
 
