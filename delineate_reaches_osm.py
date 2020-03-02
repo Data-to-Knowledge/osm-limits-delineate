@@ -117,17 +117,17 @@ def osm_delineation(param):
         new1['OBJECTID'] = list(range(max_id, max_id + len(new1)))
         new1.rename(columns={'geometry': 'SHAPE'}, inplace=True)
 
-        mssql.update_table_rows(new1, param['gis_waterdata']['server'], param['gis_waterdata']['database'], param['gis_waterdata']['reaches']['table'], on=['SpatialUnitId', 'OSMWaterwayId'], index=False, append=True, username=None, password=None, geo_col='SHAPE', clear_table=False, dtype=sql_dtypes)
+        mssql.update_table_rows(new1, param['gis_waterdata']['server'], param['gis_waterdata']['database'], param['gis_waterdata']['reaches']['table'], on=['SpatialUnitId', 'OSMWaterwayId'], index=False, append=True, username=param['gis_waterdata']['username'], password=param['gis_waterdata']['password'], geo_col='SHAPE', clear_table=False, dtype=sql_dtypes)
 
     if not diff1.empty:
         diff2 = pd.merge(diff1, old1[['SpatialUnitId', 'OSMWaterwayId', 'OBJECTID']], on=['SpatialUnitId', 'OSMWaterwayId'])
         diff2['ModifiedDate'] = today_str
         diff2.rename(columns={'geometry': 'SHAPE'}, inplace=True)
 
-        mssql.update_table_rows(diff2, param['gis_waterdata']['server'], param['gis_waterdata']['database'], param['gis_waterdata']['reaches']['table'], on=['SpatialUnitId', 'OSMWaterwayId'], index=False, append=True, username=None, password=None, geo_col='SHAPE', clear_table=False, dtype=sql_dtypes)
+        mssql.update_table_rows(diff2, param['gis_waterdata']['server'], param['gis_waterdata']['database'], param['gis_waterdata']['reaches']['table'], on=['SpatialUnitId', 'OSMWaterwayId'], index=False, append=True, username=param['gis_waterdata']['username'], password=param['gis_waterdata']['password'], geo_col='SHAPE', clear_table=False, dtype=sql_dtypes)
 
     if not rem1.empty:
-        mssql.del_table_rows(param['gis_waterdata']['server'], param['gis_waterdata']['database'], param['gis_waterdata']['reaches']['table'], pk_df=rem1, username=None, password=None)
+        mssql.del_table_rows(param['gis_waterdata']['server'], param['gis_waterdata']['database'], param['gis_waterdata']['reaches']['table'], pk_df=rem1, username=param['gis_waterdata']['username'], password=param['gis_waterdata']['password'])
 
     return gdf4
 
