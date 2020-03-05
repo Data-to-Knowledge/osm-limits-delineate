@@ -51,12 +51,14 @@ def osm_delineation(param):
     no_limit1 = [j for j in json_lst if j['id'] == param['other']['no_limit_id']][0]
     no_limit2 = [s['id'] for s in no_limit1['spatialUnit']][0]
 
-    pts = mssql.rd_sql(param['gis_waterdata']['server'], param['gis_waterdata']['database'], param['gis_waterdata']['pts']['table'], [param['gis_waterdata']['pts']['id']], geo_col=True, username=param['gis_waterdata']['username'], password=param['gis_waterdata']['password'], rename_cols=[id_col])
+    pts = mssql.rd_sql(param['gis_waterdata']['server'], param['gis_waterdata']['database'], param['gis_waterdata']['pts']['table'], [param['gis_waterdata']['pts']['id']], where_in={param['gis_waterdata']['pts']['id']: pts_alt.id.unique().tolist()}, geo_col=True, username=param['gis_waterdata']['username'], password=param['gis_waterdata']['password'], rename_cols=[id_col])
+#    pts = mssql.rd_sql(param['gis_waterdata']['server'], param['gis_waterdata']['database'], param['gis_waterdata']['pts']['table'], [param['gis_waterdata']['pts']['id']], where_in={param['gis_waterdata']['pts']['id']: pts_alt.id.unique().tolist()}, geo_col=True, rename_cols=[id_col])
 #    pts.rename(columns={param['gis_waterdata']['pts']['id']: id_col}, inplace=True)
 
     cwms1 = mssql.rd_sql(param['gis_prod']['server'], param['gis_prod']['database'], param['gis_prod']['cwms']['table'], param['gis_prod']['cwms']['col_names'], rename_cols=param['gis_prod']['cwms']['rename_cols'], geo_col=True, username=param['gis_prod']['username'], password=param['gis_prod']['password'])
 
     zones3 = mssql.rd_sql(param['gis_waterdata']['server'], param['gis_waterdata']['database'], param['gis_waterdata']['allo_zones']['table'], [param['gis_waterdata']['allo_zones']['id']], where_in={param['gis_waterdata']['allo_zones']['id']: combined_zones2}, username=param['gis_waterdata']['username'], password=param['gis_waterdata']['password'], geo_col=True, rename_cols=[id_col])
+#    zones3 = mssql.rd_sql(param['gis_waterdata']['server'], param['gis_waterdata']['database'], param['gis_waterdata']['allo_zones']['table'], [param['gis_waterdata']['allo_zones']['id']], where_in={param['gis_waterdata']['allo_zones']['id']: combined_zones2}, geo_col=True, rename_cols=[id_col])
 
     pts['geometry'] = pts.geometry.simplify(1)
 
@@ -100,6 +102,7 @@ def osm_delineation(param):
     cols.extend(['OBJECTID'])
 
     old1 = mssql.rd_sql(param['gis_waterdata']['server'], param['gis_waterdata']['database'], param['gis_waterdata']['reaches']['table'], cols, username=param['gis_waterdata']['username'], password=param['gis_waterdata']['password'], geo_col=True)
+#    old1 = mssql.rd_sql(param['gis_waterdata']['server'], param['gis_waterdata']['database'], param['gis_waterdata']['reaches']['table'], cols, geo_col=True)
 
     comp_dict = util.compare_dfs(old1.drop('OBJECTID', axis=1), gdf4, on=['SpatialUnitId', 'OSMWaterwayId'])
     new1 = comp_dict['new'].copy()
@@ -118,6 +121,7 @@ def osm_delineation(param):
         new1.rename(columns={'geometry': 'SHAPE'}, inplace=True)
 
         mssql.update_table_rows(new1, param['gis_waterdata']['server'], param['gis_waterdata']['database'], param['gis_waterdata']['reaches']['table'], on=['SpatialUnitId', 'OSMWaterwayId'], index=False, append=True, username=param['gis_waterdata']['username'], password=param['gis_waterdata']['password'], geo_col='SHAPE', clear_table=False, dtype=sql_dtypes)
+#        mssql.update_table_rows(new1, param['gis_waterdata']['server'], param['gis_waterdata']['database'], param['gis_waterdata']['reaches']['table'], on=['SpatialUnitId', 'OSMWaterwayId'], index=False, append=True, geo_col='SHAPE', clear_table=False, dtype=sql_dtypes)
 
     if not diff1.empty:
         diff2 = pd.merge(diff1, old1[['SpatialUnitId', 'OSMWaterwayId', 'OBJECTID']], on=['SpatialUnitId', 'OSMWaterwayId'])
@@ -125,9 +129,11 @@ def osm_delineation(param):
         diff2.rename(columns={'geometry': 'SHAPE'}, inplace=True)
 
         mssql.update_table_rows(diff2, param['gis_waterdata']['server'], param['gis_waterdata']['database'], param['gis_waterdata']['reaches']['table'], on=['SpatialUnitId', 'OSMWaterwayId'], index=False, append=True, username=param['gis_waterdata']['username'], password=param['gis_waterdata']['password'], geo_col='SHAPE', clear_table=False, dtype=sql_dtypes)
+#        mssql.update_table_rows(diff2, param['gis_waterdata']['server'], param['gis_waterdata']['database'], param['gis_waterdata']['reaches']['table'], on=['SpatialUnitId', 'OSMWaterwayId'], index=False, append=True, geo_col='SHAPE', clear_table=False, dtype=sql_dtypes)
 
     if not rem1.empty:
         mssql.del_table_rows(param['gis_waterdata']['server'], param['gis_waterdata']['database'], param['gis_waterdata']['reaches']['table'], pk_df=rem1, username=param['gis_waterdata']['username'], password=param['gis_waterdata']['password'])
+#        mssql.del_table_rows(param['gis_waterdata']['server'], param['gis_waterdata']['database'], param['gis_waterdata']['reaches']['table'], pk_df=rem1)
 
     return gdf4
 
