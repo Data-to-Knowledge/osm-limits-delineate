@@ -85,14 +85,16 @@ def osm_delineation(param):
     cant2 = osm.get_waterways_within_boundary(cwms1, buffer=0, waterway_type='all')
 
     combined1, poly1 = vector.pts_poly_join(cant2, zones3, id_col, op='intersects')
+    gdf3 = gdf3[~gdf3.way_id.isin(combined1.way_id.unique())].copy()
 
     all_others1 = cant2[~cant2.way_id.isin(combined1.way_id)]
-    all_others2 = all_others1[~all_others1.way_id.isin(gdf2.way_id.unique().tolist())].copy()
+    all_others2 = all_others1[~all_others1.way_id.isin(gdf3.way_id.unique().tolist())].copy()
     all_others2[id_col] = no_limit2
 
     print('--Combine all reach data')
 
     gdf4 = pd.concat([gdf3, combined1, all_others2]).reset_index(drop=True)
+
     gdf4.rename(columns={'way_id': 'OSMWaterwayId', 'waterway': 'OSMWaterwayType', 'name': 'RiverName', 'start_node': 'StartNode'}, inplace=True)
     gdf4['OSMWaterwayId'] = gdf4['OSMWaterwayId'].astype('int64')
 

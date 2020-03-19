@@ -24,7 +24,7 @@ print('---Read in parameters')
 
 #base_dir = os.path.realpath(os.path.dirname(__file__))
 #
-#with open(os.path.join(base_dir, 'parameters-dev.yml')) as param:
+#with open(os.path.join(base_dir, 'parameters-test.yml')) as param:
 #    param = yaml.safe_load(param)
 
 parser = argparse.ArgumentParser()
