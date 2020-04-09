@@ -35,8 +35,8 @@ def osm_delineation(param):
     ########################################
     ### Load data
 
-    run_time_start = pd.Timestamp.today().strftime('%Y-%m-%d %H:%M:%S')
-    print(run_time_start)
+    # run_time_start = pd.Timestamp.today().strftime('%Y-%m-%d %H:%M:%S')
+    # print(run_time_start)
 
     ## Read in source data
     print('--Reading in source data...')
@@ -53,7 +53,18 @@ def osm_delineation(param):
 
     # pts = mssql.rd_sql(param['gis_waterdata']['server'], param['gis_waterdata']['database'], param['gis_waterdata']['pts']['table'], [param['gis_waterdata']['pts']['id']], where_in={param['gis_waterdata']['pts']['id']: pts_alt.id.unique().tolist()}, geo_col=True, username=param['gis_waterdata']['username'], password=param['gis_waterdata']['password'], rename_cols=[id_col])
     pts = mssql.rd_sql(param['gis_waterdata']['server'], param['gis_waterdata']['database'], param['gis_waterdata']['pts']['table'], [param['gis_waterdata']['pts']['id']], where_in={param['gis_waterdata']['pts']['id']: pts_alt.id.unique().tolist()}, geo_col=True, rename_cols=[id_col])
-#    pts.rename(columns={param['gis_waterdata']['pts']['id']: id_col}, inplace=True)
+
+    ## Point checks
+    excluded_points = pts_alt[~pts_alt.id.isin(pts.SpatialUnitId)].copy()
+    if not excluded_points.empty:
+        print('These points have a GIS location, but are not in the Plan Limits db:')
+        print(excluded_points)
+
+    bad_geo = pts[pts.geom_type != 'Point']
+    if not bad_geo.empty:
+        print('These points do not have a "Point" geometry (likely "MultiPoint"):')
+        print(bad_geo)
+        pts = pts[~pts.SpatialUnitId.isin(bad_geo.SpatialUnitId)].copy()
 
     cwms1 = mssql.rd_sql(param['gis_prod']['server'], param['gis_prod']['database'], param['gis_prod']['cwms']['table'], param['gis_prod']['cwms']['col_names'], rename_cols=param['gis_prod']['cwms']['rename_cols'], geo_col=True, username=param['gis_prod']['username'], password=param['gis_prod']['password'])
 
@@ -66,7 +77,7 @@ def osm_delineation(param):
     ### Run query
     print('--Pull out the waterways from OSM')
 
-    pts1 = osm.get_nearest_waterways(pts, id_col, 100, 'all')
+    pts1, bad_points = osm.get_nearest_waterways(pts, id_col, param['other']['search_distance'], 'all')
 
     waterways, nodes = osm.get_waterways(pts1, 'all')
 
@@ -137,7 +148,7 @@ def osm_delineation(param):
         # mssql.del_table_rows(param['gis_waterdata']['server'], param['gis_waterdata']['database'], param['gis_waterdata']['reaches']['table'], pk_df=rem1, username=param['gis_waterdata']['username'], password=param['gis_waterdata']['password'])
         mssql.del_table_rows(param['gis_waterdata']['server'], param['gis_waterdata']['database'], param['gis_waterdata']['reaches']['table'], pk_df=rem1)
 
-    return gdf4
+    return gdf4, excluded_points, bad_geo, bad_points
 
 ########################################
 ### Testing
