@@ -1,0 +1,16 @@
+name: osm-delin
+channels:
+- conda-forge
+- mullenkamp
+- defaults
+dependencies:
+- python=3.7
+- pyyaml
+- geopandas
+- pandas
+# - pymssql=2.1.4
+- pdsql
+- gistools
+- rtree
+- osm2geojson
+- overpass

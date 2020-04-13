@@ -57,7 +57,7 @@ def osm_delineation(param):
     ## Point checks
     excluded_points = pts_alt[~pts_alt.id.isin(pts.SpatialUnitId)].copy()
     if not excluded_points.empty:
-        print('These points have a GIS location, but are not in the Plan Limits db:')
+        print('These points are in the Plan Limits db, but have no GIS data:')
         print(excluded_points)
 
     bad_geo = pts[pts.geom_type != 'Point']
