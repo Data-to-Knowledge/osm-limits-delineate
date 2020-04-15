@@ -5,12 +5,12 @@ channels:
 - defaults
 dependencies:
 - python=3.7
-- pyyaml
-- geopandas
-- pandas
+- pyyaml=5.3.1
+- geopandas=0.7.0
+- pandas=1.0.3
 # - pymssql=2.1.4
-- pdsql
-- gistools
-- rtree
+- pdsql=1.2.34
+- gistools=1.2.18
+- rtree=0.9.4
 - osm2geojson
 - overpass
